@@ -1,0 +1,36 @@
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false  # true by default
+
+api:
+  dashboard: true  # true by default
+  insecure: true  # Don't do this in production!
+  debug: true
+
+entryPoints:
+  web:
+    address: :80
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+
+  websecure:
+    address: :443
+
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: EMAIL@ADDRESS.HERE
+      storage: /etc/traefik/certs/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+providers:
+  file:
+    filename: /etc/traefik/config.yml
+    watch: true

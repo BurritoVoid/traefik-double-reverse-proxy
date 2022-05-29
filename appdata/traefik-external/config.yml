@@ -1,0 +1,17 @@
+http:
+  routers:
+    jellyfin:
+      entryPoints:
+        - "websecure"
+      rule: "Host(`jellyfin.example.com`)"
+      service: jellyfin
+      tls:
+        certresolver: cloudflare
+        domains:
+          - main: "jellyfin.example.com"
+  
+  services:
+    jellyfin:
+      loadBalancer:
+        servers:
+          - url: "https://jellyfin.example.com"

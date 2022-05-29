@@ -1,0 +1,98 @@
+version: '3'
+
+services:
+  traefik-internal:
+    image: "traefik:v2.5"
+    container_name: "traefik-internal"
+    networks:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      # (Optional) Expose Dashboard
+      - "8080:8080"  # Don't do this in production!
+    volumes:
+      - /opt/appdata/traefik:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CF_API_EMAIL=EMAIL@ADDRESS.HERE
+      - CF_API_KEY=APIKEYHERE
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.example.com`)"
+      - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+      - "traefik.http.routers.traefik-secure.entrypoints=websecure"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.example.com`)"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].main=example.com"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.example.com"
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  traefik-external:
+    image: "traefik:v2.5"
+    container_name: "traefik-external"
+    ports:
+      - "81:80"
+      - "444:443"
+      # (Optional) Expose Dashboard
+      - "8081:8080"  # Don't do this in production!
+    volumes:
+      - /opt/appdata/traefik-ext:/etc/traefik
+    environment:
+      - CF_API_EMAIL=EMAIL@ADDRESS.HERE
+      - CF_API_KEY=APIKEYHERE
+
+  heimdall:
+      image: lscr.io/linuxserver/heimdall
+      container_name: heimdall
+      environment:
+        - PUID=1000
+        - PGID=1000
+        - TZ=America/New_York
+      volumes:
+          - /opt/appdata/heimdall:/config
+      networks:
+          - proxy
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.heimdall.entrypoints=websecure
+        - traefik.http.routers.heimdall.rule=Host(`heimdall.example.com`)
+        - traefik.http.routers.heimdall.tls=true
+      ports:
+        - 8888:80
+        - 8889:443
+      restart: unless-stopped
+  
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    # volumes:
+    #   - /path/to/library:/config
+    #   - /path/to/tvseries:/data/tvshows
+    #   - /path/to/movies:/data/movies
+    ports:
+      - 8096:8096
+      - 8920:8920 #optional
+      - 7359:7359/udp #optional
+      - 1900:1900/udp #optional
+    networks:
+          - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jellyfin.entrypoints=websecure
+      - traefik.http.routers.jellyfin.rule=Host(`jellyfin.example.com`)
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+      - traefik.http.routers.jellyfin.tls=true
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: false
